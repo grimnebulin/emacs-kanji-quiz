@@ -15,7 +15,8 @@
 
 (require 'cl)
 
-(defvar kanji-quiz-page-positions nil)
+(defvar kanji-quiz-terms nil)
+(defvar kanji-quiz-current-term nil)
 (defvar kanji-quiz-next-page nil)
 (defconst kanji-quiz-size-factor 5.0)
 
@@ -31,15 +32,16 @@
 (defun kanji-quiz-next-word ()
   (interactive)
   (when (null kanji-quiz-next-page)
-    (setq kanji-quiz-next-page (kanji-quiz-shuffle kanji-quiz-page-positions)))
+    (setq kanji-quiz-next-page (kanji-quiz-shuffle kanji-quiz-terms)))
   (widen)
-  (goto-char (pop kanji-quiz-next-page))
+  (setq kanji-quiz-current-term (pop kanji-quiz-next-page))
+  (goto-char (cdr (alist-get 'english kanji-quiz-current-term)))
   (narrow-to-page))
 
 (defun kanji-quiz-next-term (limit)
   (when (re-search-forward "\\(.+\\)\n\\(.+\\)\n\\(\\(?:.+\n?\\)+\\)\n*" limit t)
     (list
-     (propertize (match-string-no-properties 1) 'display `(height ,kanji-quiz-size-factor))
+     (propertize (concat (match-string-no-properties 1) "　") 'display `(height ,kanji-quiz-size-factor))
      (save-match-data (split-string (match-string-no-properties 2) "\\(?:　\\|\\s-\\)+"))
      (match-string-no-properties 3))))
 
@@ -64,24 +66,40 @@
     (setq buffer-read-only nil)
     (erase-buffer)
     (setq-local kanji-quiz-next-page nil)
-    (setq-local kanji-quiz-page-positions
-      (cl-loop for (line furigana definition) = (with-current-buffer terms-buffer (kanji-quiz-next-term end))
+    (setq-local kanji-quiz-terms
+      (cl-loop with furigana-pos = nil
+               with kanji-pos = nil
+               with english-pos = nil
+               for (line furigana definition) = (with-current-buffer terms-buffer (kanji-quiz-next-term end))
                while line collect
         (let ((p (point)))
-          (save-excursion (insert line "\n" line "\n"))
+          (save-excursion
+            (insert line "\n")
+            (setq kanji-pos (cons (point) (prog2 (insert line) (point) (insert "\n")))))
           (while (re-search-forward "\\cC" (line-end-position) t)
             (put-text-property p (point) 'face `(:foreground ,background))
-            (replace-match
-             (let ((next-furigana (pop furigana)))
-               (propertize
-                (concat "　" next-furigana "　")
-                'display
-                `(height ,(/ kanji-quiz-size-factor (+ 2 (length next-furigana)))))))
+            (push (cons (point)
+                        (progn
+                          (replace-match
+                           (let ((next-furigana (pop furigana)))
+                             (propertize
+                              (concat "　" next-furigana "　")
+                              'display
+                              `(height ,(/ kanji-quiz-size-factor (+ 2 (length next-furigana)))))))
+                          (point)))
+                  furigana-pos)
             (setq p (point)))
           (put-text-property p (line-end-position) 'face `(:foreground ,background))
           (forward-line 2)
-          (insert definition)
-          (prog1 (point) (insert "\n\f\n")))))
+          (setq english-pos (cons (point) (progn (insert definition) (point))))
+          ;; Want instead:
+          ;; ((furigana . ((furigana-pos-start . furigana-pos-end) ...))
+          ;;  (kanji . (kanji-pos-start . kanji-pos-end))
+          ;;  (english . (english-pos-start . english-pos-end)))
+          (insert "\n\f\n")
+          (list (cons 'furigana (prog1 furigana-pos (setq furigana-pos nil)))
+                (cons 'kanji kanji-pos)
+                (cons 'english english-pos)))))
     (with-current-buffer terms-buffer (goto-char terms-point))
     (setq buffer-read-only t)
     (kanji-quiz-next-word)))
