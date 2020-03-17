@@ -3,6 +3,16 @@
 ; copy of first line with all non-kanji characters invisible
 ; and all kanji replaced by successive chars from the following line
 
+; https://emacs.stackexchange.com/questions/5495/how-can-i-determine-the-width-of-characters-on-the-screen
+
+;; Want to implement:
+;; Option A: Start with Kanji only showing; "n" -> show pronunciation; "n" -> show English
+;; Option B: Start with English; "n" -> show Kanji; "n" -> show pronunciation
+;; Need to store for each term:
+;;   - buffer position range for English text
+;;   - buffer position range for kanji
+;;   - buffer position ranges for visible pronunciation chars
+
 (require 'cl)
 
 (defvar kanji-quiz-page-positions nil)
@@ -37,10 +47,13 @@
   (cl-loop with shuffled = (copy-sequence list)
            for i from (length shuffled) downto 2
            do (rotatef (elt shuffled (random i)) (elt shuffled (1- i)))
-           return shuffled))
+           finally return shuffled))
 
 (defun kanji-quiz-start (start end)
-  (interactive "r")
+  (interactive
+   (if (region-active-p)
+       (list (min (point) (mark)) (max (point) (mark)))
+     (list (point) (point-max))))
   (let ((terms-buffer (current-buffer))
         (terms-point (point))
         (quiz-buffer (get-buffer-create "*kanji-quiz*"))
