@@ -11,12 +11,18 @@
 (defvar kanji-quiz-current-term nil)
 (defvar kanji-quiz-next-step nil)
 (defvar kanji-quiz-next-page nil)
-(defconst kanji-quiz-size-factor 5.0)
+(defvar kanji-quiz-progression nil)
+(defconst kanji-quiz-size-factor 6.0)
 
-(defconst kanji-quiz-progression
+(defconst kanji-quiz-progression-kanji-first
   '(((show kanji) (hide furigana english))
     ((show furigana))
     ((show english))))
+
+(defconst kanji-quiz-progression-english-first
+  '(((hide kanji furigana) (show english))
+    ((show kanji))
+    ((show furigana))))
 
 (defvar kanji-quiz-mode-map
   (let ((keymap (make-sparse-keymap)))
@@ -42,18 +48,32 @@
 
 (defun kanji-quiz-show-and-hide (actions)
   (cl-loop with inhibit-read-only = t
-    for (action . labels) in actions do
+    for (action . labels) in actions sum
     (cl-loop with color = (face-attribute 'default (if (eq action 'show) :foreground :background))
-      for label in labels do
-      (cl-loop for (start . end) in (alist-get label kanji-quiz-current-term) do
-        (put-text-property start end 'face (list :foreground color))))))
+      for label in labels sum
+      (cl-loop with positions = (alist-get label kanji-quiz-current-term)
+        for (start . end) in positions
+        do (put-text-property start end 'face `(:foreground ,color))
+        finally return (length positions)))))
 
 (defun kanji-quiz-next-term (limit)
-  (when (re-search-forward "\\(.+\\)\n\\(.+\\)\n\\(\\(?:.+\n?\\)+\\)\n*" limit t)
-    (list
-     (propertize (concat (match-string-no-properties 1) "　") 'display `(height ,kanji-quiz-size-factor))
-     (save-match-data (split-string (match-string-no-properties 2) "\\(?:　\\|\\s-\\)+"))
-     (match-string-no-properties 3))))
+  (let ((lines (cl-loop while (re-search-forward "\\=\\(.+\\)\n?" limit t)
+                 collect (list (match-string-no-properties 1)
+                               (match-beginning 1)
+                               (match-end 1)))))
+    (re-search-forward "\\=\n*" limit t)
+    (when (<= 2 (length lines))
+      (let* ((term (propertize (concat (caar lines) "　") 'display `(height ,kanji-quiz-size-factor)))
+             (kanji-count (how-many "\\cC" (nth 1 (car lines)) (nth 2 (car lines)))))
+        (cond
+         ((zerop kanji-count)
+          (list term nil (string-join (mapcar #'car (cdr lines)) "\n")))
+         ((= 2 (length lines))
+          (error "Missing definition"))
+         ((/= kanji-count (how-many "[^[:space:]　]+" (nth 1 (nth 1 lines)) (nth 2 (nth 1 lines))))
+          (error "Furigana count does not match kanji count"))
+         (t
+          (list term (split-string (car (nth 1 lines)) "\\(?:　\\|\\s-\\)+") (string-join (mapcar #'car (cddr lines)) "\n"))))))))
 
 (defun kanji-quiz-shuffle (list)
   (cl-loop with shuffled = (copy-sequence list)
@@ -76,6 +96,7 @@
     (setq buffer-read-only nil)
     (erase-buffer)
     (setq-local kanji-quiz-next-page nil)
+    (setq-local kanji-quiz-progression kanji-quiz-progression-kanji-first)
     (setq-local kanji-quiz-terms
       (cl-loop with furigana-pos = nil
                with kanji-pos = nil
