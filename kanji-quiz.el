@@ -5,38 +5,48 @@
 
 ; https://emacs.stackexchange.com/questions/5495/how-can-i-determine-the-width-of-characters-on-the-screen
 
-;; Want to implement:
-;; Option A: Start with Kanji only showing; "n" -> show pronunciation; "n" -> show English
-;; Option B: Start with English; "n" -> show Kanji; "n" -> show pronunciation
-;; Need to store for each term:
-;;   - buffer position range for English text
-;;   - buffer position range for kanji
-;;   - buffer position ranges for visible pronunciation chars
-
-(require 'cl)
+(require 'cl-lib)
 
 (defvar kanji-quiz-terms nil)
 (defvar kanji-quiz-current-term nil)
+(defvar kanji-quiz-next-step nil)
 (defvar kanji-quiz-next-page nil)
 (defconst kanji-quiz-size-factor 5.0)
 
+(defconst kanji-quiz-progression
+  '(((show kanji) (hide furigana english))
+    ((show furigana))
+    ((show english))))
+
 (defvar kanji-quiz-mode-map
   (let ((keymap (make-sparse-keymap)))
-    (define-key keymap "n" #'kanji-quiz-next-word)
+    (define-key keymap "n" #'kanji-quiz-advance)
     (define-key keymap "q" #'bury-buffer)
     keymap))
 
 (define-derived-mode kanji-quiz-mode fundamental-mode "漢字"
   "Major mode for a kanji quiz")
 
-(defun kanji-quiz-next-word ()
+(defun kanji-quiz-advance ()
   (interactive)
-  (when (null kanji-quiz-next-page)
-    (setq kanji-quiz-next-page (kanji-quiz-shuffle kanji-quiz-terms)))
-  (widen)
-  (setq kanji-quiz-current-term (pop kanji-quiz-next-page))
-  (goto-char (cdr (alist-get 'english kanji-quiz-current-term)))
-  (narrow-to-page))
+  (if kanji-quiz-next-step
+      (kanji-quiz-show-and-hide (pop kanji-quiz-next-step))
+    (when (null kanji-quiz-next-page)
+      (setq kanji-quiz-next-page (kanji-quiz-shuffle kanji-quiz-terms)))
+    (setq kanji-quiz-current-term (pop kanji-quiz-next-page))
+    (setq kanji-quiz-next-step kanji-quiz-progression)
+    (widen)
+    (kanji-quiz-show-and-hide (pop kanji-quiz-next-step))
+    (goto-char (cdar (alist-get 'english kanji-quiz-current-term)))
+    (narrow-to-page)))
+
+(defun kanji-quiz-show-and-hide (actions)
+  (cl-loop with inhibit-read-only = t
+    for (action . labels) in actions do
+    (cl-loop with color = (face-attribute 'default (if (eq action 'show) :foreground :background))
+      for label in labels do
+      (cl-loop for (start . end) in (alist-get label kanji-quiz-current-term) do
+        (put-text-property start end 'face (list :foreground color))))))
 
 (defun kanji-quiz-next-term (limit)
   (when (re-search-forward "\\(.+\\)\n\\(.+\\)\n\\(\\(?:.+\n?\\)+\\)\n*" limit t)
@@ -48,7 +58,7 @@
 (defun kanji-quiz-shuffle (list)
   (cl-loop with shuffled = (copy-sequence list)
            for i from (length shuffled) downto 2
-           do (rotatef (elt shuffled (random i)) (elt shuffled (1- i)))
+           do (cl-rotatef (elt shuffled (random i)) (elt shuffled (1- i)))
            finally return shuffled))
 
 (defun kanji-quiz-start (start end)
@@ -74,9 +84,8 @@
                while line collect
         (let ((p (point)))
           (save-excursion
-            (insert line "\n")
-            (setq kanji-pos (cons (point) (prog2 (insert line) (point) (insert "\n")))))
-          (while (re-search-forward "\\cC" (line-end-position) t)
+            (insert line "\n" line "\n"))
+          (while (re-search-forward (rx (category chinese-two-byte)) (line-end-position) t)
             (put-text-property p (point) 'face `(:foreground ,background))
             (push (cons (point)
                         (progn
@@ -91,15 +100,13 @@
             (setq p (point)))
           (put-text-property p (line-end-position) 'face `(:foreground ,background))
           (forward-line 2)
+          (setq kanji-pos (cons (line-beginning-position 0) (line-end-position 0)))
           (setq english-pos (cons (point) (progn (insert definition) (point))))
-          ;; Want instead:
-          ;; ((furigana . ((furigana-pos-start . furigana-pos-end) ...))
-          ;;  (kanji . (kanji-pos-start . kanji-pos-end))
-          ;;  (english . (english-pos-start . english-pos-end)))
           (insert "\n\f\n")
           (list (cons 'furigana (prog1 furigana-pos (setq furigana-pos nil)))
-                (cons 'kanji kanji-pos)
-                (cons 'english english-pos)))))
+                (cons 'kanji (list kanji-pos))
+                (cons 'english (list english-pos))))))
     (with-current-buffer terms-buffer (goto-char terms-point))
     (setq buffer-read-only t)
-    (kanji-quiz-next-word)))
+    (setq-local kanji-quiz-next-step nil)
+    (kanji-quiz-advance)))
