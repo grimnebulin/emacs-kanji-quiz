@@ -35,14 +35,14 @@
 
 (defun kanji-quiz-advance ()
   (interactive)
-  (if kanji-quiz-next-step
-      (kanji-quiz-show-and-hide (pop kanji-quiz-next-step))
+  (unless (cl-loop while kanji-quiz-next-step
+                   thereis (/= 0 (kanji-quiz-show-and-hide (pop kanji-quiz-next-step))))
     (when (null kanji-quiz-next-page)
       (setq kanji-quiz-next-page (kanji-quiz-shuffle kanji-quiz-terms)))
     (setq kanji-quiz-current-term (pop kanji-quiz-next-page))
     (setq kanji-quiz-next-step kanji-quiz-progression)
     (widen)
-    (kanji-quiz-show-and-hide (pop kanji-quiz-next-step))
+    (while (zerop (kanji-quiz-show-and-hide (pop kanji-quiz-next-step))))
     (goto-char (cdar (alist-get 'english kanji-quiz-current-term)))
     (narrow-to-page)))
 
@@ -122,7 +122,7 @@
           (put-text-property p (line-end-position) 'face `(:foreground ,background))
           (forward-line 2)
           (setq kanji-pos (cons (line-beginning-position 0) (line-end-position 0)))
-          (setq english-pos (cons (point) (progn (insert definition) (point))))
+          (setq english-pos (cons (point) (progn (insert definition "\n") (point))))
           (insert "\n\f\n")
           (list (cons 'furigana (prog1 furigana-pos (setq furigana-pos nil)))
                 (cons 'kanji (list kanji-pos))
