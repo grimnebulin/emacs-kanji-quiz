@@ -79,11 +79,18 @@
            do (cl-rotatef (elt shuffled (random i)) (elt shuffled (1- i)))
            finally return shuffled))
 
+(defun kanji-quiz-region ()
+  (cond
+   ((region-active-p)
+    (list (min (point) (mark)) (max (point) (mark))))
+   (current-prefix-arg
+    (let ((end (save-excursion (forward-paragraph (prefix-numeric-value current-prefix-arg)) (point))))
+      (list (min (point) end) (max (point) end))))
+   (t
+    (list (point) (point-max)))))
+
 (defun kanji-quiz-start (start end)
-  (interactive
-   (if (region-active-p)
-       (list (min (point) (mark)) (max (point) (mark)))
-     (list (point) (point-max))))
+  (interactive (kanji-quiz-region))
   (let ((terms-buffer (current-buffer))
         (terms-point (point))
         (quiz-buffer (get-buffer-create "*kanji-quiz*"))
