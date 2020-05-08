@@ -27,6 +27,7 @@
 (defvar kanji-quiz-mode-map
   (let ((keymap (make-sparse-keymap)))
     (define-key keymap "n" #'kanji-quiz-advance)
+    (define-key keymap "x" #'kanji-quiz-eject-term)
     (define-key keymap "q" #'bury-buffer)
     keymap))
 
@@ -37,26 +38,36 @@
   (interactive)
   (unless (cl-loop while kanji-quiz-next-step
                    thereis (/= 0 (kanji-quiz-show-and-hide (pop kanji-quiz-next-step))))
-    (when (null kanji-quiz-next-page)
-      (setq kanji-quiz-next-page (kanji-quiz-shuffle kanji-quiz-terms)))
-    (setq kanji-quiz-current-term (pop kanji-quiz-next-page))
-    (setq kanji-quiz-next-step kanji-quiz-progression)
-    (widen)
-    (while (zerop (kanji-quiz-show-and-hide (pop kanji-quiz-next-step))))
-    (goto-char (cdar (alist-get 'english kanji-quiz-current-term)))
-    (narrow-to-page)))
+    (kanji-quiz-next-term t)))
+
+(defun kanji-quiz-eject-term ()
+  (interactive)
+  (kanji-quiz-next-term nil))
+
+(defun kanji-quiz-next-term (save-current-term)
+  (when (null kanji-quiz-next-page)
+    (setq kanji-quiz-next-page (kanji-quiz-shuffle kanji-quiz-terms))
+    (setq kanji-quiz-terms nil))
+  (when save-current-term
+    (push kanji-quiz-current-term kanji-quiz-terms))
+  (setq kanji-quiz-current-term (pop kanji-quiz-next-page))
+  (setq kanji-quiz-next-step kanji-quiz-progression)
+  (widen)
+  (while (zerop (kanji-quiz-show-and-hide (pop kanji-quiz-next-step))))
+  (goto-char (cdar (alist-get 'english kanji-quiz-current-term)))
+  (narrow-to-page))
 
 (defun kanji-quiz-show-and-hide (actions)
   (cl-loop with inhibit-read-only = t
-    for (action . labels) in actions sum
-    (cl-loop with color = (face-attribute 'default (if (eq action 'show) :foreground :background))
-      for label in labels sum
-      (cl-loop with positions = (alist-get label kanji-quiz-current-term)
-        for (start . end) in positions
-        do (put-text-property start end 'face `(:foreground ,color))
-        finally return (length positions)))))
+    for (action . labels) in actions
+    sum (cl-loop with color = (face-attribute 'default (if (eq action 'show) :foreground :background))
+          for label in labels
+          sum (cl-loop with positions = (alist-get label kanji-quiz-current-term)
+                for (start . end) in positions
+                do (put-text-property start end 'face `(:foreground ,color))
+                finally return (length positions)))))
 
-(defun kanji-quiz-next-term (limit)
+(defun kanji-quiz-parse-term (limit)
   (let ((lines (cl-loop while (re-search-forward "\\=\\(.+\\)\n?" limit t)
                  collect (cons (cons (match-beginning 1) (match-end 1)) (match-string-no-properties 1)))))
     (re-search-forward "\\=\n*" limit t)
@@ -106,7 +117,7 @@
       (cl-loop with furigana-pos = nil
                with kanji-pos = nil
                with english-pos = nil
-               for (line furigana definition) = (with-current-buffer terms-buffer (kanji-quiz-next-term end))
+               for (line furigana definition) = (with-current-buffer terms-buffer (kanji-quiz-parse-term end))
                while line collect
         (let ((p (point)))
           (save-excursion
