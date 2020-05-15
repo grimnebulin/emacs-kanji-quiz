@@ -48,7 +48,7 @@
   (when (null kanji-quiz-next-page)
     (setq kanji-quiz-next-page (kanji-quiz-shuffle kanji-quiz-terms))
     (setq kanji-quiz-terms nil))
-  (when save-current-term
+  (when (and save-current-term kanji-quiz-current-term)
     (push kanji-quiz-current-term kanji-quiz-terms))
   (setq kanji-quiz-current-term (pop kanji-quiz-next-page))
   (setq kanji-quiz-next-step kanji-quiz-progression)
