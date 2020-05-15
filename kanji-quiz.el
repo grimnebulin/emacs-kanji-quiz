@@ -68,21 +68,21 @@
                 finally return (length positions)))))
 
 (defun kanji-quiz-parse-term (limit)
-  (let ((lines (cl-loop while (re-search-forward "\\=\\(.+\\)\n?" limit t)
+  (let ((lines (cl-loop while (re-search-forward (rx point (group (+ nonl)) (? ?\n)) limit t)
                  collect (cons (cons (match-beginning 1) (match-end 1)) (match-string-no-properties 1)))))
-    (re-search-forward "\\=\n*" limit t)
+    (re-search-forward (rx point (* ?\n)) limit t)
     (when (cdr lines)
       (let* ((term (propertize (concat (cdar lines) "　") 'display `(height ,kanji-quiz-size-factor)))
-             (kanji-count (how-many "\\cC" (caaar lines) (cdaar lines))))
+             (kanji-count (how-many (rx (category chinese-two-byte)) (caaar lines) (cdaar lines))))
         (cond
          ((zerop kanji-count)
           (list term nil (string-join (mapcar #'cdr (cdr lines)) "\n")))
          ((null (cddr lines))
           (throw 'kanji-quiz-format (cons "Missing definition" (caaadr lines))))
-         ((/= kanji-count (how-many "[^[:space:]　]+" (caaadr lines) (cdaadr lines)))
+         ((/= kanji-count (how-many (rx (+ (not (any space "　")))) (caaadr lines) (cdaadr lines)))
           (throw 'kanji-quiz-format (cons "Furigana count does not match kanji count" (caaadr lines))))
          (t
-          (list term (split-string (cdadr lines) "\\(?:　\\|\\s-\\)+") (string-join (mapcar #'cdr (cddr lines)) "\n"))))))))
+          (list term (split-string (cdadr lines) (rx (+ (| (syntax whitespace) "　")))) (string-join (mapcar #'cdr (cddr lines)) "\n"))))))))
 
 (defun kanji-quiz-shuffle (list)
   (cl-loop with shuffled = (copy-sequence list)
