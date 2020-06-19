@@ -100,8 +100,15 @@
    (t
     (list (point) (point-max)))))
 
-(defun kanji-quiz-start (start end)
+(defun kanji-quiz-start-english-first (start end)
   (interactive (kanji-quiz-region))
+  (kanji-quiz-start start end kanji-quiz-progression-english-first))
+
+(defun kanji-quiz-start-kanji-first (start end)
+  (interactive (kanji-quiz-region))
+  (kanji-quiz-start start end kanji-quiz-progression-kanji-first))
+
+(defun kanji-quiz-start (start end progression)
   (let ((terms-buffer (current-buffer))
         (terms-point (point))
         (quiz-buffer (get-buffer-create "*kanji-quiz*"))
@@ -112,7 +119,7 @@
     (setq buffer-read-only nil)
     (erase-buffer)
     (setq-local kanji-quiz-next-page nil)
-    (setq-local kanji-quiz-progression kanji-quiz-progression-kanji-first)
+    (setq-local kanji-quiz-progression progression)
     (setq-local kanji-quiz-terms
       (cl-loop with furigana-pos = nil
                with kanji-pos = nil
