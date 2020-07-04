@@ -2,7 +2,7 @@
 
 (require 'cl-lib)
 
-(defvar kanji-quiz-terms nil
+(defvar kanji-quiz-next-terms nil
   "A list of the terms that will be shown on the next pass through the quiz.")
 
 (defvar kanji-quiz-current-term nil
@@ -44,16 +44,16 @@
 
 (defun kanji-quiz-eject-term ()
   (interactive)
-  (if (null kanji-quiz-terms)
+  (if (and (null kanji-quiz-pages) (null kanji-quiz-next-terms))
       (message "No more terms")
     (kanji-quiz-next-term nil)))
 
 (defun kanji-quiz-next-term (save-current-term)
-  (when (null kanji-quiz-pages)
-    (setq kanji-quiz-pages (kanji-quiz-shuffle kanji-quiz-terms))
-    (setq kanji-quiz-terms nil))
   (when (and save-current-term kanji-quiz-current-term)
-    (push kanji-quiz-current-term kanji-quiz-terms))
+    (push kanji-quiz-current-term kanji-quiz-next-terms))
+  (when (null kanji-quiz-pages)
+    (setq kanji-quiz-pages (kanji-quiz-shuffle kanji-quiz-next-terms))
+    (setq kanji-quiz-next-terms nil))
   (setq kanji-quiz-current-term (pop kanji-quiz-pages))
   (setq kanji-quiz-steps kanji-quiz-progression)
   (widen)
@@ -151,7 +151,7 @@
     (pop-to-buffer (get-buffer-create "*kanji-quiz*"))
     (kanji-quiz-mode)
     (setq-local
-     kanji-quiz-terms
+     kanji-quiz-next-terms
      (let ((inhibit-read-only t))
        (erase-buffer)
        (kanji-quiz-populate-quiz-buffer
