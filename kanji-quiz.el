@@ -2,11 +2,18 @@
 
 (require 'cl-lib)
 
-(defvar kanji-quiz-terms nil)
-(defvar kanji-quiz-current-term nil)
-(defvar kanji-quiz-next-step nil)
-(defvar kanji-quiz-next-page nil)
+(defvar kanji-quiz-terms nil
+  "A list of the terms that will be shown on the next pass through the quiz.")
+
+(defvar kanji-quiz-current-term nil
+  "The current term being displayed.")
+
+(defvar kanji-quiz-steps nil)
+
+(defvar kanji-quiz-pages nil)
+
 (defvar kanji-quiz-progression nil)
+
 (defconst kanji-quiz-size-factor 6.0)
 
 (defconst kanji-quiz-progression-kanji-first
@@ -31,8 +38,8 @@
 
 (defun kanji-quiz-advance ()
   (interactive)
-  (unless (cl-loop while kanji-quiz-next-step
-                   thereis (/= 0 (kanji-quiz-show-and-hide (pop kanji-quiz-next-step))))
+  (unless (cl-loop while kanji-quiz-steps
+                   thereis (/= 0 (kanji-quiz-show-and-hide (pop kanji-quiz-steps))))
     (kanji-quiz-next-term t)))
 
 (defun kanji-quiz-eject-term ()
@@ -42,15 +49,15 @@
     (kanji-quiz-next-term nil)))
 
 (defun kanji-quiz-next-term (save-current-term)
-  (when (null kanji-quiz-next-page)
-    (setq kanji-quiz-next-page (kanji-quiz-shuffle kanji-quiz-terms))
+  (when (null kanji-quiz-pages)
+    (setq kanji-quiz-pages (kanji-quiz-shuffle kanji-quiz-terms))
     (setq kanji-quiz-terms nil))
   (when (and save-current-term kanji-quiz-current-term)
     (push kanji-quiz-current-term kanji-quiz-terms))
-  (setq kanji-quiz-current-term (pop kanji-quiz-next-page))
-  (setq kanji-quiz-next-step kanji-quiz-progression)
+  (setq kanji-quiz-current-term (pop kanji-quiz-pages))
+  (setq kanji-quiz-steps kanji-quiz-progression)
   (widen)
-  (while (zerop (kanji-quiz-show-and-hide (pop kanji-quiz-next-step))))
+  (while (zerop (kanji-quiz-show-and-hide (pop kanji-quiz-steps))))
   (goto-char (cdar (alist-get 'english kanji-quiz-current-term)))
   (narrow-to-page))
 
@@ -69,7 +76,7 @@
                  collect (cons (cons (match-beginning 1) (match-end 1)) (match-string-no-properties 1)))))
     (re-search-forward (rx point (* ?\n)) limit t)
     (when (cdr lines)
-      (let* ((term (propertize (concat (cdar lines) "　") 'display `(height ,kanji-quiz-size-factor)))
+      (let* ((term (cdar lines))
              (kanji-count (how-many (rx (category chinese-two-byte)) (caaar lines) (cdaar lines))))
         (cond
          ((zerop kanji-count)
@@ -108,10 +115,11 @@
 (defun kanji-quiz-populate-quiz-buffer (next-term)
   (cl-loop
    with background = (face-attribute 'default :background)
-   for (line furigana definition) = (funcall next-term)
-   while line
+   for (term furigana definition) = (funcall next-term)
+   while term
    collect
-   (let ((p (point))
+   (let ((line (propertize (concat term "　") 'display `(height ,kanji-quiz-size-factor)))
+         (p (point))
          (furigana-pos nil))
      (save-excursion
        (insert line "\n" line "\n"))
@@ -131,7 +139,8 @@
      (let* ((kanji-pos (cons (line-beginning-position 0) (line-end-position 0)))
             (english-pos (cons (point) (progn (insert definition "\n") (point)))))
        (insert "\n\f\n")
-       (list (cons 'furigana furigana-pos)
+       (list (cons 'term term)
+             (cons 'furigana furigana-pos)
              (cons 'kanji (list kanji-pos))
              (cons 'english (list english-pos)))))))
 
@@ -148,7 +157,7 @@
        (kanji-quiz-populate-quiz-buffer
         (lambda () (with-current-buffer terms-buffer (kanji-quiz-parse-term end))))))
     (with-current-buffer terms-buffer (goto-char terms-point))
-    (setq-local kanji-quiz-next-page nil)
-    (setq-local kanji-quiz-next-step nil)
+    (setq-local kanji-quiz-pages nil)
+    (setq-local kanji-quiz-steps nil)
     (setq-local kanji-quiz-progression progression)
     (kanji-quiz-advance)))
