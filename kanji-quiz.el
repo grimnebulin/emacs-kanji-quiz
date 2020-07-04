@@ -159,5 +159,6 @@
     (with-current-buffer terms-buffer (goto-char terms-point))
     (setq-local kanji-quiz-pages nil)
     (setq-local kanji-quiz-steps nil)
+    (setq-local kanji-quiz-current-term nil)
     (setq-local kanji-quiz-progression progression)
     (kanji-quiz-advance)))
