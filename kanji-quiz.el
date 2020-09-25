@@ -59,7 +59,8 @@
   (widen)
   (while (zerop (kanji-quiz-show-and-hide (pop kanji-quiz-steps))))
   (goto-char (cdar (alist-get 'english kanji-quiz-current-term)))
-  (narrow-to-page))
+  (narrow-to-page)
+  (recenter-top-bottom -1))
 
 (defun kanji-quiz-show-and-hide (actions)
   (cl-loop with inhibit-read-only = t
