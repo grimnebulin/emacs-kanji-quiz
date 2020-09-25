@@ -149,7 +149,7 @@
   (let ((terms-buffer (current-buffer))
         (terms-point (point)))
     (goto-char start)
-    (pop-to-buffer (get-buffer-create "*kanji-quiz*"))
+    (switch-to-buffer (get-buffer-create "*kanji-quiz*"))
     (kanji-quiz-mode)
     (setq-local
      kanji-quiz-next-terms
