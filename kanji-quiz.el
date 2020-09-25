@@ -89,10 +89,10 @@
           (list term (split-string (cdadr lines) (rx (+ (| (syntax whitespace) "　")))) (string-join (mapcar #'cdr (cddr lines)) "\n"))))))))
 
 (defun kanji-quiz-shuffle (list)
-  (cl-loop with shuffled = (copy-sequence list)
+  (cl-loop with shuffled = (vconcat list)
            for i from (length shuffled) downto 2
            do (cl-rotatef (elt shuffled (random i)) (elt shuffled (1- i)))
-           finally return shuffled))
+           finally return (append shuffled nil)))
 
 (defun kanji-quiz-region ()
   (cond
