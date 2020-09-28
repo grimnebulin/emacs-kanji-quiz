@@ -2,17 +2,17 @@
 
 This package provides commands which process a buffer of Japanese
 vocabulary terms in a simple format, and present those terms to the
-user in a quiz format.
+user in a simple flashcard-like format.
 
 ![Demo Animation](../assets/kanji-quiz-demo.gif?raw=true)
 
 # Quiz Input Format
 
-Each vocabulary term is described in a "paragraph," in the Emacs
+Each vocabulary term is described in a "paragraph," in the usual Emacs
 sense; that is, each is separated from the next by two or more newline
-characters. 
+characters.
 
-The first line in the paragraph is the Japanese term--a word or
+The first line in the paragraph is the Japanese term: a word or
 phrase, of which any number of characters are kanji (that is,
 characters which match the Emacs regular expression `\cC`).
 
@@ -22,12 +22,15 @@ successive kanji character, in order.  The readings are separated by
 any space character (those matching the regular expression `\s-`, or
 the Unicode character IDEOGRAPHIC SPACE, U+3000).
 
-The remaining lines of each paragraph--that is, the are the English
-definition of the term.  The definition may extend over any number of
-lines.
+The remaining lines of each paragraph are the English definition of
+the term.  The definition may extend over any number of lines.
 
 If the number of provided readings does not match the number of kanji
 in the term, an error will be signaled when the terms are parsed.
+
+Terms which consist of multiple kanji characters whose pronunciation
+is represented by a single group of furigana—for example, 今日
+(きょう, kyō; "today")—are not yet supported.
 
 ## Examples
 
@@ -55,10 +58,10 @@ Some terms with kanji:
 
 Two commands are provided to start a quiz.
 
-* kanji-quiz-start-english-first
+* `kanji-quiz-start-english-first`  
   The quiz first presents the English definition of each term, then
   the Japanese term, then the kanji readings (if any).
-* kanji-quiz-start-kanji-first
+* `kanji-quiz-start-kanji-first`  
   The quiz first presents the Japanese term, then the kanji readings
   (if any), then the English definition.
 
@@ -72,12 +75,12 @@ the command is invoked.
   taken.
   
 The order of the terms is randomized when the quiz begins.  When the
-user advances beyond the last term, the order is re-randomized, and
-the terms are presented again.
+user advances beyond the last term, the order of the terms not yet
+ejected is re-randomized, and those terms are presented again.
 
 # Quiz commands
 
-Three commands are provided while a quiz is active:
+Three keystroke commands are provided while a quiz is active:
 
 * `n`: `kanji-quiz-advance`  
   Advances the quiz one step.  That is:
@@ -88,9 +91,14 @@ Three commands are provided while a quiz is active:
     hiragana readings (if any), to the English definition, to the next
     term.
 * `x`: `kanji-quiz-eject-term`  
-  Advance to the next term.  The current term will not be repeated.
-  If the current term is the only term remaining in the quiz, an error
-  message is presented instead.
+  Advance to the next term.  The current term will not be repeated
+  during the current quiz.  If the current term is the only term
+  remaining in the quiz, an error message is presented instead.
 * `q`: `bury-buffer`  
   This is the usual Emacs command that sends the quiz buffer to the
   bottom of the buffer list.
+
+An in-progress quiz cannot be restarted from the beginning as such.
+To do so, re-issue a quiz-beginning command
+(`kanji-quiz-start-kanji-first` or `kanji-quiz-start-english-first`)
+and give it the same set of terms.

@@ -50,7 +50,7 @@ then, show the Japanese term; then, show the furigana (if any).")
     (define-key keymap "x" #'kanji-quiz-eject-term)
     (define-key keymap "q" #'bury-buffer)
     keymap)
-  "Keymap for kanji-quiz-mode.")
+  "Keymap for `kanji-quiz-mode'.")
 
 (define-derived-mode kanji-quiz-mode fundamental-mode "漢字"
   "Major mode for a kanji quiz")
@@ -167,14 +167,16 @@ otherwise, return the bounds from point to the end of the buffer."
 (defun kanji-quiz-start-english-first (start end)
   "Start a quiz where the English definition is presented first.
 
-Interactively, the arguments are supplied by ‘kanji-quiz-region’."
+Interactively, the START and END arguments are supplied by
+‘kanji-quiz-region’."
   (interactive (kanji-quiz-region))
   (kanji-quiz-start start end kanji-quiz-progression-english-first))
 
 (defun kanji-quiz-start-kanji-first (start end)
   "Start a quiz where the Japanese term is presented first.
 
-Interactively, the arguments are supplied by ‘kanji-quiz-region’."
+Interactively, the START and END arguments are supplied by
+‘kanji-quiz-region’."
   (interactive (kanji-quiz-region))
   (kanji-quiz-start start end kanji-quiz-progression-kanji-first))
 
