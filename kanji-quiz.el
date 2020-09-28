@@ -1,6 +1,7 @@
 ;; -*- lexical-binding: t; -*-
 
 (require 'cl-lib)
+(require 'subr-x)
 
 (defvar kanji-quiz-next-terms nil
   "A list of the terms that will be shown on the next pass through the quiz.")
@@ -8,47 +9,73 @@
 (defvar kanji-quiz-current-term nil
   "The current term being displayed.")
 
-(defvar kanji-quiz-steps nil)
+(defvar kanji-quiz-steps nil
+  "A list of the steps for the current quiz.
 
-(defvar kanji-quiz-pages nil)
+In practice, this will be one of either ‘kanji-quiz-progression-kanji-first’
+or ‘kanji-quiz-progression-english-first’.")
 
-(defvar kanji-quiz-progression nil)
+(defvar kanji-quiz-pages nil
+  "A list of the terms remaining in the current quiz.
 
-(defconst kanji-quiz-size-factor 6.0)
+This does not include terms that have been ejected by ‘kanji-quiz-eject-term’.")
+
+(defvar kanji-quiz-progression nil
+  "A list of the steps remaining in the current quiz.")
+
+(defconst kanji-quiz-size-factor 6.0
+  "The factor by which the Japanese characters in this quiz will be enlarged.")
 
 (defconst kanji-quiz-progression-kanji-first
   '(((show kanji) (hide furigana english))
     ((show furigana))
-    ((show english))))
+    ((show english)))
+  "The steps for a kanji-first quiz.
+
+First, show the Japanese term and hide the furigana and English definition;
+then, show the furigana (if any); then, show the English definition.")
 
 (defconst kanji-quiz-progression-english-first
-  '(((hide kanji furigana) (show english))
+  '(((show english) (hide kanji furigana))
     ((show kanji))
-    ((show furigana))))
+    ((show furigana)))
+  "The steps for an English-first quiz.
+
+First, show the English definition and hide the Japanese term and furigana;
+then, show the Japanese term; then, show the furigana (if any).")
 
 (defvar kanji-quiz-mode-map
   (let ((keymap (make-sparse-keymap)))
     (define-key keymap "n" #'kanji-quiz-advance)
     (define-key keymap "x" #'kanji-quiz-eject-term)
     (define-key keymap "q" #'bury-buffer)
-    keymap))
+    keymap)
+  "Keymap for kanji-quiz-mode.")
 
 (define-derived-mode kanji-quiz-mode fundamental-mode "漢字"
   "Major mode for a kanji quiz")
 
 (defun kanji-quiz-advance ()
+  "Advance to the next step or term of the current quiz.
+
+Retain the current term to be presented again later."
   (interactive)
   (unless (cl-loop while kanji-quiz-steps
                    thereis (/= 0 (kanji-quiz-show-and-hide (pop kanji-quiz-steps))))
     (kanji-quiz-next-term t)))
 
 (defun kanji-quiz-eject-term ()
+  "Advance to the next term in the current quiz.
+
+The current term will not be presented again.  If no terms would remain,
+present a message to that effect instead."
   (interactive)
   (if (and (null kanji-quiz-pages) (null kanji-quiz-next-terms))
       (message "No more terms")
     (kanji-quiz-next-term nil)))
 
 (defun kanji-quiz-next-term (save-current-term)
+  "Advance to the next term; retain the current term is SAVE-CURRENT-TERM is not nil."
   (when (and save-current-term kanji-quiz-current-term)
     (push kanji-quiz-current-term kanji-quiz-next-terms))
   (when (null kanji-quiz-pages)
@@ -63,6 +90,14 @@
   (recenter-top-bottom -1))
 
 (defun kanji-quiz-show-and-hide (actions)
+  "Show and/or hide text in the currently displayed term according to ACTIONS.
+
+ACTIONS should be a list of one or two lists, each consisting of the symbol
+‘show’ or ‘hide’ and followed by one or more of the symbols ‘kanji’, ‘furigana’,
+or ‘english’.  The total number of changes performed is returned.  In practice,
+this will be zero if only a single action referring to furigana is present, and
+the current term has no associated furigana.  Otherwise, a positive number is
+returned."
   (cl-loop with inhibit-read-only = t
     for (action . labels) in actions
     sum (cl-loop with color = (face-attribute 'default (if (eq action 'show) :foreground :background))
@@ -73,6 +108,24 @@
                 finally return (length positions)))))
 
 (defun kanji-quiz-parse-term (limit)
+  "Parse the kanji quiz term at point, to a maximum buffer position of LIMIT.
+
+The format for a quiz term is as follows:
+
+- a Japanese term occupying exactly one line;
+- an optional list of furigana strings on one line, separated by any combination
+  of whitespace-syntax characters or the Unicode character IDEOGRAPHIC SPACE
+  (U+3000); and
+- an English definition occupying one or more lines, terminated by two or more
+  newline characters.
+
+A three-element list is returned, containing the Japanese term as a string; a list
+of furigana characters equal in length to the number of kanji characters in the term,
+or nil if there aren't any; and the English term as a single string with embedded
+newline characters.
+
+An error is raised if the furigana count does not match the count of kanji characters
+in the term, or if the definition is missing."
   (let ((lines (cl-loop while (re-search-forward (rx point (group (+ nonl)) (? ?\n)) limit t)
                  collect (cons (cons (match-beginning 1) (match-end 1)) (match-string-no-properties 1)))))
     (re-search-forward (rx point (* ?\n)) limit t)
@@ -90,12 +143,18 @@
           (list term (split-string (cdadr lines) (rx (+ (| (syntax whitespace) "　")))) (string-join (mapcar #'cdr (cddr lines)) "\n"))))))))
 
 (defun kanji-quiz-shuffle (list)
+  "Return a copy of LIST with its elements randomly shuffled."
   (cl-loop with shuffled = (vconcat list)
            for i from (length shuffled) downto 2
            do (cl-rotatef (elt shuffled (random i)) (elt shuffled (1- i)))
            finally return (append shuffled nil)))
 
 (defun kanji-quiz-region ()
+  "Return the bounds of the region which should be parsed for quiz terms.
+
+If the region is active, return its bounds; otherwise, if there is a prefix
+argument, return the bounds from point to that many paragraphs beyond point;
+otherwise, return the bounds from point to the end of the buffer."
   (cond
    ((region-active-p)
     (list (min (point) (mark)) (max (point) (mark))))
@@ -106,14 +165,36 @@
     (list (point) (point-max)))))
 
 (defun kanji-quiz-start-english-first (start end)
+  "Start a quiz where the English definition is presented first.
+
+Interactively, the arguments are supplied by ‘kanji-quiz-region’."
   (interactive (kanji-quiz-region))
   (kanji-quiz-start start end kanji-quiz-progression-english-first))
 
 (defun kanji-quiz-start-kanji-first (start end)
+  "Start a quiz where the Japanese term is presented first.
+
+Interactively, the arguments are supplied by ‘kanji-quiz-region’."
   (interactive (kanji-quiz-region))
   (kanji-quiz-start start end kanji-quiz-progression-kanji-first))
 
 (defun kanji-quiz-populate-quiz-buffer (next-term)
+  "Populate the current buffer with quiz terms supplied by the function NEXT-TERM.
+
+NEXT-TERM will be called repeatedly, without arguments.  Each
+invocation should return a quiz term in the format emitted by
+‘kanji-quiz-parse-term’, or nil, signifying that no more terms
+are available.
+
+An alist will be returned with the following symbolic keys:
+
+- ‘term’: the Japanese term
+- ‘furigana’: a list of buffer positions for the term's furigana, if any,
+  in the form (start . end)
+- ‘kanji’: a list containing a single cons cell containing the buffer
+  positions of the start and end of the term's Japanese text
+- ‘english’: a list containing a single cons cell containing the
+  buffer positions of the start and end of the term's English definition"
   (cl-loop
    with background = (face-attribute 'default :background)
    for (term furigana definition) = (funcall next-term)
@@ -146,6 +227,15 @@
              (cons 'english (list english-pos)))))))
 
 (defun kanji-quiz-start (start end progression)
+  "Create a kanji quiz buffer, populate it with terms, and switch to it.
+
+Terms are parsed from the current buffer, from buffer positions START to END.
+PROGRESSION is a list of steps to follow for each term; in practice this will
+be one of `kanji-quiz-progression-kanji-first' or ‘kanji-quiz-progression-english-first’.
+
+The new buffer will always be named \"*kanji-quiz*\" and will be placed into
+mode ‘kanji-quiz-mode’.  The supplied terms will be randomized and the first
+one displayed."
   (let ((terms-buffer (current-buffer))
         (terms-point (point)))
     (goto-char start)
