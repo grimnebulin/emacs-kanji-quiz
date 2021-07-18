@@ -23,29 +23,32 @@ This does not include terms that have been ejected by â€˜kanji-quiz-eject-termâ€
 (defvar kanji-quiz-progression nil
   "A list of the steps remaining in the current quiz.")
 
+(defvar kanji-quiz-extra-text-function nil
+  "A function which produces extra text for terms.")
+
 (defconst kanji-quiz-size-factor 6.0
   "The factor by which the Japanese characters in this quiz will be enlarged.")
 
 (defconst kanji-quiz-progression-kanji-first
-  '(((show kanji) (hide furigana english))
+  '(((show kanji) (hide furigana english extra))
     ((show furigana))
-    ((show english)))
+    ((show english extra)))
   "The steps for a kanji-first quiz.
 
 First, show the Japanese term and hide the furigana and English definition;
 then, show the furigana (if any); then, show the English definition.")
 
 (defconst kanji-quiz-progression-english-first
-  '(((show english) (hide kanji furigana))
+  '(((show english) (hide kanji furigana extra))
     ((show kanji))
-    ((show furigana)))
+    ((show furigana extra)))
   "The steps for an English-first quiz.
 
 First, show the English definition and hide the Japanese term and furigana;
 then, show the Japanese term; then, show the furigana (if any).")
 
 (defconst kanji-quiz-progression-all
-  '(((show english kanji furigana)))
+  '(((show english kanji furigana extra)))
   "The single step for a \"quiz\" that shows everything at once.")
 
 (defvar kanji-quiz-mode-map
@@ -106,10 +109,11 @@ returned."
     for (action . labels) in actions
     sum (cl-loop with color = (face-attribute 'default (if (eq action 'show) :foreground :background))
           for label in labels
-          sum (cl-loop with positions = (alist-get label kanji-quiz-current-term)
-                for (start . end) in positions
-                do (put-text-property start end 'face `(:foreground ,color))
-                finally return (length positions)))))
+          sum (if-let (positions (alist-get label kanji-quiz-current-term))
+                  (cl-loop for (start . end) in positions
+                           do (put-text-property start end 'face `(:foreground ,color))
+                           finally return (length positions))
+                0))))
 
 (defun kanji-quiz-parse-term (limit)
   "Parse the kanji quiz term at point, to a maximum buffer position of LIMIT.
@@ -236,12 +240,16 @@ An alist will be returned with the following symbolic keys:
      (put-text-property p (line-end-position) 'face `(:foreground ,background))
      (forward-line 2)
      (let* ((kanji-pos (cons (line-beginning-position 0) (line-end-position 0)))
-            (english-pos (cons (point) (progn (insert definition "\n") (point)))))
+            (english-pos (cons (point) (progn (insert definition "\n") (point))))
+            (extra-pos (when-let (extra-text (and kanji-quiz-extra-text-function
+                                                  (funcall kanji-quiz-extra-text-function term)))
+                         (cons (progn (insert "\n") (point)) (progn (insert extra-text "\n") (point))))))
        (insert "\n\f\n")
        (list (cons 'term term)
              (cons 'furigana furigana-pos)
              (cons 'kanji (list kanji-pos))
-             (cons 'english (list english-pos)))))))
+             (cons 'english (list english-pos))
+             (cons 'extra (and extra-pos (list extra-pos))))))))
 
 (defun kanji-quiz-start (start end progression)
   "Create a kanji quiz buffer, populate it with terms, and switch to it.
