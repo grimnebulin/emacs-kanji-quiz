@@ -180,6 +180,11 @@ Interactively, the START and END arguments are supplied by
   (interactive (kanji-quiz-region))
   (kanji-quiz-start start end kanji-quiz-progression-kanji-first))
 
+(defun kanji-quiz-buffer-substring-width (start end)
+  "Sum the widths of all characters in the buffer from START to END."
+  (cl-loop for pos from start to (1- end)
+           sum (aref (aref (font-get-glyphs (font-at pos) pos (1+ pos)) 0) 4)))
+
 (defun kanji-quiz-populate-quiz-buffer (next-term)
   "Populate the current buffer with quiz terms supplied by the function NEXT-TERM.
 
@@ -210,12 +215,14 @@ An alist will be returned with the following symbolic keys:
      (while (re-search-forward (rx (category chinese-two-byte)) (line-end-position) t)
        (put-text-property p (point) 'face `(:foreground ,background))
        (let* ((start (point))
+              (kanji-width (kanji-quiz-buffer-substring-width (1- (point)) (point)))
               (next-furigana (pop furigana)))
-         (replace-match
-          (propertize
-           (concat "　" next-furigana "　")
-           'display
-           `(height ,(/ kanji-quiz-size-factor (+ 2 (length next-furigana))))))
+         (replace-match (concat " " next-furigana " "))
+         (let ((width (kanji-quiz-buffer-substring-width (- (point) 2 (length next-furigana)) (point))))
+           (put-text-property
+            (- (point) 2 (length next-furigana))
+            (point)
+            'display (list 'height (/ (* kanji-width kanji-quiz-size-factor) width))))
          (push (cons start (point)) furigana-pos))
        (setq p (point)))
      (put-text-property p (line-end-position) 'face `(:foreground ,background))
