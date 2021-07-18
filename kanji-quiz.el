@@ -44,6 +44,10 @@ then, show the furigana (if any); then, show the English definition.")
 First, show the English definition and hide the Japanese term and furigana;
 then, show the Japanese term; then, show the furigana (if any).")
 
+(defconst kanji-quiz-progression-all
+  '(((show english kanji furigana)))
+  "The single step for a \"quiz\" that shows everything at once.")
+
 (defvar kanji-quiz-mode-map
   (let ((keymap (make-sparse-keymap)))
     (define-key keymap "n" #'kanji-quiz-advance)
@@ -179,6 +183,10 @@ Interactively, the START and END arguments are supplied by
 ‘kanji-quiz-region’."
   (interactive (kanji-quiz-region))
   (kanji-quiz-start start end kanji-quiz-progression-kanji-first))
+
+(defun kanji-quiz-start-show-everything (start end)
+  (interactive (kanji-quiz-region))
+  (kanji-quiz-start start end kanji-quiz-progression-all))
 
 (defun kanji-quiz-buffer-substring-width (start end)
   "Sum the widths of all characters in the buffer from START to END."
