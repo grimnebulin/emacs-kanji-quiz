@@ -282,4 +282,5 @@ one displayed."
     (setq-local kanji-quiz-steps nil)
     (setq-local kanji-quiz-current-term nil)
     (setq-local kanji-quiz-progression progression)
+    (setq buffer-read-only t)
     (kanji-quiz-advance)))
