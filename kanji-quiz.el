@@ -32,7 +32,7 @@ This does not include terms that have been ejected by ‘kanji-quiz-eject-term�
 (defconst kanji-quiz-progression-kanji-first
   '(((show kanji) (hide furigana english extra))
     ((show furigana))
-    ((show english extra)))
+    ((show english)))
   "The steps for a kanji-first quiz.
 
 First, show the Japanese term and hide the furigana and English definition;
@@ -41,23 +41,28 @@ then, show the furigana (if any); then, show the English definition.")
 (defconst kanji-quiz-progression-english-first
   '(((show english) (hide kanji furigana extra))
     ((show kanji))
-    ((show furigana extra)))
+    ((show furigana)))
   "The steps for an English-first quiz.
 
 First, show the English definition and hide the Japanese term and furigana;
 then, show the Japanese term; then, show the furigana (if any).")
 
 (defconst kanji-quiz-progression-all
-  '(((show english kanji furigana extra)))
+  '(((show english kanji furigana)))
   "The single step for a \"quiz\" that shows everything at once.")
 
 (defvar kanji-quiz-mode-map
   (let ((keymap (make-sparse-keymap)))
     (define-key keymap "n" #'kanji-quiz-advance)
     (define-key keymap "x" #'kanji-quiz-eject-term)
+    (define-key keymap "m" #'kanji-quiz-extra-text)
     (define-key keymap "q" #'bury-buffer)
     keymap)
   "Keymap for `kanji-quiz-mode'.")
+
+(defun kanji-quiz-extra-text ()
+  (interactive)
+  (kanji-quiz-show-and-hide '((show extra))))
 
 (define-derived-mode kanji-quiz-mode fundamental-mode "漢字"
   "Major mode for a kanji quiz")
