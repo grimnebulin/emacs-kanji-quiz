@@ -123,22 +123,29 @@ returned."
 (defun kanji-quiz-parse-term (limit)
   "Parse the kanji quiz term at point, to a maximum buffer position of LIMIT.
 
-The format for a quiz term is as follows:
+The line following point is taken to be a Japanese term.
 
-- a Japanese term occupying exactly one line;
-- an optional list of furigana strings on one line, separated by any combination
-  of whitespace-syntax characters or the Unicode character IDEOGRAPHIC SPACE
-  (U+3000); and
-- an English definition occupying one or more lines, terminated by two or more
-  newline characters.
+If the term contains any kanji characters, then the next line is taken to
+contain furigana describing how to pronounce those characters.  The line is
+split on whitespace--here including the Unicode character IDEOGRAPHIC SPACE
+(U+3000)--to get a list of furigana strings, which describe how to pronounce
+the kanji, in the same order.  Each furigana string may be followed by a
+positive integer in parentheses, in which case that integer describes how many
+kanji the furigana covers; if there is no trailing parenthesized number, the
+furigana covers a single kanji.
 
-A three-element list is returned, containing the Japanese term as a string; a list
-of furigana characters equal in length to the number of kanji characters in the term,
-or nil if there aren't any; and the English term as a single string with embedded
-newline characters.
+Lines following the furigana, if present, or the term otherwise, up to the
+smaller of the LIMIT buffer position and two successive newlines, are the
+English description of the term.
 
-An error is raised if the furigana count does not match the count of kanji characters
-in the term, or if the definition is missing."
+A three-element list is returned, containing the Japanese term as a string;
+a list of cons cells, one for each furigana, where the car is the furigana
+text and the cdr is the number of kanji covered by the furigana; and the
+English term as a single string with embedded newline characters.
+
+An error is raised if the number of kanji characters in the term does not
+match the total of the furigana cover counts, if a count of zero is provided,
+or if the definition is missing."
   (let ((lines (cl-loop while (re-search-forward (rx point (group (+ nonl)) (? ?\n)) limit t)
                  collect (cons (cons (match-beginning 1) (match-end 1)) (match-string-no-properties 1)))))
     (re-search-forward (rx point (* ?\n)) limit t)
@@ -150,10 +157,33 @@ in the term, or if the definition is missing."
           (list term nil (string-join (mapcar #'cdr (cdr lines)) "\n")))
          ((null (cddr lines))
           (throw 'kanji-quiz-format (cons "Missing definition" (caaadr lines))))
-         ((/= kanji-count (how-many (rx (+ (not (any space "　")))) (caaadr lines) (cdaadr lines)))
-          (throw 'kanji-quiz-format (cons "Furigana count does not match kanji count" (caaadr lines))))
          (t
-          (list term (split-string (cdadr lines) (rx (+ (| (syntax whitespace) "　")))) (string-join (mapcar #'cdr (cddr lines)) "\n"))))))))
+          (let ((furigana (kanji-quiz-parse-furigana (cdadr lines))))
+            (cond
+             ((/= kanji-count (apply #'+ (mapcar #'cdr furigana)))
+              (throw 'kanji-quiz-format (cons "Sum of furigana spans does not match kanji count" (caaadr lines))))
+             (t
+              (list term furigana (string-join (mapcar #'cdr (cddr lines)) "\n")))))))))))
+
+(defun kanji-quiz-parse-furigana (str)
+  "Parse a string STR into a list of furigana.
+
+The string is split on whitespace characters, which for this purpose includes
+the Unicode character IDEOGRAPHIC SPACE (U+3000).  Each extracted substring
+is checked to see if it ends with a positive integer in parentheses, which
+is the number of kanji the furigana spans.  If so, the corresponding element
+of the returned list is a cons cell containing the text preceding the opening
+parenthesis and the span; if not, the element is a cons cell containing
+the entirety of the furigana text and the number 1."
+  (mapcar
+   (lambda (str)
+     (if (string-match (rx "(" (group (+ (any digit))) ")" string-end) str)
+         (let ((count (string-to-number (match-string 1 str))))
+           (if (zerop count)
+               (error "Furigana may not span zero characters")
+             (cons (substring str 0 (1- (match-beginning 1))) count)))
+       (cons str 1)))
+   (split-string str (rx (+ (| (syntax whitespace) "　"))))))
 
 (defun kanji-quiz-shuffle (list)
   "Return a copy of LIST with its elements randomly shuffled."
@@ -218,7 +248,9 @@ An alist will be returned with the following symbolic keys:
 - ‘kanji’: a list containing a single cons cell containing the buffer
   positions of the start and end of the term's Japanese text
 - ‘english’: a list containing a single cons cell containing the
-  buffer positions of the start and end of the term's English definition"
+  buffer positions of the start and end of the term's English definition
+- ‘extra’: a list containing a single cons cell containing the buffer
+  positions of the start and end of extra text"
   (cl-loop
    with background = (face-attribute 'default :background)
    for (term furigana definition) = (funcall next-term)
@@ -227,20 +259,19 @@ An alist will be returned with the following symbolic keys:
    (let ((line (propertize (concat term "　") 'display `(height ,kanji-quiz-size-factor)))
          (p (point))
          (furigana-pos nil))
-     (save-excursion
-       (insert line "\n" line "\n"))
-     (while (re-search-forward (rx (category chinese-two-byte)) (line-end-position) t)
+     (save-excursion (insert line "\n" line "\n"))
+     (cl-loop for (furigana-text . furigana-span) in furigana do
+       (re-search-forward (format "\\cC\\{%d\\}" furigana-span) (line-end-position))
        (put-text-property p (point) 'face `(:foreground ,background))
-       (let* ((start (point))
-              (kanji-width (kanji-quiz-buffer-substring-width (1- (point)) (point)))
-              (next-furigana (pop furigana)))
-         (replace-match (concat " " next-furigana " "))
-         (let ((width (kanji-quiz-buffer-substring-width (- (point) 2 (length next-furigana)) (point))))
+       (let ((kanji-width (kanji-quiz-buffer-substring-width (- (point) furigana-span) (point))))
+         (replace-match (concat " " furigana-text " "))
+         (let* ((furigana-start (- (point) 2 (length furigana-text)))
+                (furigana-width (kanji-quiz-buffer-substring-width furigana-start (point))))
            (put-text-property
-            (- (point) 2 (length next-furigana))
+            furigana-start
             (point)
-            'display (list 'height (/ (* kanji-width kanji-quiz-size-factor) width))))
-         (push (cons start (point)) furigana-pos))
+            'display (list 'height (/ (* kanji-width kanji-quiz-size-factor) furigana-width)))
+           (push (cons furigana-start (point)) furigana-pos)))
        (setq p (point)))
      (put-text-property p (line-end-position) 'face `(:foreground ,background))
      (forward-line 2)

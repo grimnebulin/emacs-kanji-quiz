@@ -20,17 +20,17 @@ If any of the characters in the term are kanji, then the second line
 of the paragraph must be a list of hiragana readings for each
 successive kanji character, in order.  The readings are separated by
 any space character (those matching the regular expression `\s-`, or
-the Unicode character IDEOGRAPHIC SPACE, U+3000).
+the Unicode character IDEOGRAPHIC SPACE, U+3000).  A reading may be
+followed by a positive whole number in parentheses, which indicates
+that the reading spans that number of kanji.  If a reading is not
+followed by such text, then it is taken to span a single kanji.
 
 The remaining lines of each paragraph are the English definition of
 the term.  The definition may extend over any number of lines.
 
-If the number of provided readings does not match the number of kanji
-in the term, an error will be signaled when the terms are parsed.
-
-Terms which consist of multiple kanji characters whose pronunciation
-is represented by a single group of furigana—for example, 今日
-(きょう, kyō; "today")—are not yet supported.
+If the sum of the spans of the provided readings does not match the
+number of kanji in the term, an error will be signaled when the terms
+are parsed.
 
 ## Examples
 
@@ -41,18 +41,32 @@ A term without any kanji:
 
 Some terms with kanji:
 
-> 完璧  
-> かん ぺき  
-> perfect; complete; flawless
-
 > 騒がしい  
 > さわ  
 > noisy
+
+The reading さわ (sawa) will appear centered above the character 騒.
 
 > 切り落とす  
 > き お  
 > to cut off; to lop off
 
+The readings き (sa) and お (o) will appear centered above the characters
+切 and 落 respectively.
+
+> 完璧  
+> かん ぺき  
+> perfect; complete; flawless
+
+The readings かん (kan) and ぺき (peki) will appear centered above the
+characters 完 and 璧 respectively.
+
+> 今日  
+> きょう(2)  
+> today
+
+The reading きょう (kyō) spans both of the kanji in the word 今日, and
+will be shown centered above the pair of characters.
 
 # Starting a quiz
 
