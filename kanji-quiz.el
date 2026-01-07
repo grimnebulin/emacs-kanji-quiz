@@ -303,6 +303,7 @@ one displayed."
     (switch-to-buffer (get-buffer-create "*kanji-quiz*"))
     (kanji-quiz-mode)
     (setq-local
+     nobreak-char-display nil
      kanji-quiz-next-terms
      (let ((inhibit-read-only t))
        (erase-buffer)
