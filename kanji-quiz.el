@@ -288,6 +288,9 @@ An alist will be returned with the following symbolic keys:
              (cons 'english (list english-pos))
              (cons 'extra (and extra-pos (list extra-pos))))))))
 
+(defvar kanji-quiz-parse-term-function #'kanji-quiz-parse-term
+  "The function which should be used to parse quiz terms from a buffer.")
+
 (defun kanji-quiz-start (start end progression)
   "Create a kanji quiz buffer, populate it with terms, and switch to it.
 
@@ -310,7 +313,7 @@ one displayed."
      (let ((inhibit-read-only t))
        (erase-buffer)
        (kanji-quiz-populate-quiz-buffer
-        (lambda () (with-current-buffer terms-buffer (kanji-quiz-parse-term end))))))
+        (lambda () (with-current-buffer terms-buffer (funcall kanji-quiz-parse-term-function end))))))
     (with-current-buffer terms-buffer (goto-char terms-point))
     (setq-local kanji-quiz-pages nil)
     (setq-local kanji-quiz-steps nil)
