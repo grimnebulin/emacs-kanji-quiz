@@ -87,7 +87,8 @@ present a message to that effect instead."
     (kanji-quiz-next-term nil)))
 
 (defun kanji-quiz-next-term (save-current-term)
-  "Advance to the next term; retain the current term is SAVE-CURRENT-TERM is not nil."
+  "Advance to the next term; retain the current term is SAVE-CURRENT-TERM is
+not nil."
   (when (and save-current-term kanji-quiz-current-term)
     (push kanji-quiz-current-term kanji-quiz-next-terms))
   (when (null kanji-quiz-pages)
@@ -292,7 +293,8 @@ An alist will be returned with the following symbolic keys:
 
 Terms are parsed from the current buffer, from buffer positions START to END.
 PROGRESSION is a list of steps to follow for each term; in practice this will
-be one of `kanji-quiz-progression-kanji-first' or ‘kanji-quiz-progression-english-first’.
+be one of `kanji-quiz-progression-kanji-first' or
+‘kanji-quiz-progression-english-first’.
 
 The new buffer will always be named \"*kanji-quiz*\" and will be placed into
 mode ‘kanji-quiz-mode’.  The supplied terms will be randomized and the first
