@@ -205,6 +205,17 @@ otherwise, return the bounds from point to the end of the buffer."
    (current-prefix-arg
     (let ((end (save-excursion (forward-paragraph (prefix-numeric-value current-prefix-arg)) (point))))
       (list (min (point) end) (max (point) end))))
+   ((eq major-mode 'org-mode)
+    (list (save-excursion
+            (org-next-visible-heading -1)
+            (forward-line)
+            (search-forward-regexp (rx bol nonl))
+            (forward-line 0)
+            (point))
+          (save-excursion
+            (org-next-visible-heading 1)
+            (forward-line -1)
+            (point))))
    (t
     (list (point) (point-max)))))
 
