@@ -26,7 +26,7 @@ This does not include terms that have been ejected by â€˜kanji-quiz-eject-termâ€
 (defvar kanji-quiz-extra-text-function nil
   "A function which produces extra text for terms.")
 
-(defconst kanji-quiz-size-factor 6.0
+(defvar kanji-quiz-size-factor 6.0
   "The factor by which the Japanese characters in this quiz will be enlarged.")
 
 (defconst kanji-quiz-progression-kanji-first
