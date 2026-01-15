@@ -272,7 +272,7 @@ An alist will be returned with the following symbolic keys:
          (p (point))
          (furigana-pos nil))
      (save-excursion (insert line "\n" line "\n"))
-     (cl-loop for (furigana-text . furigana-span) in furigana do
+     (cl-loop for f in furigana for (furigana-text . furigana-span) = (if (consp f) f (cons f 1)) do
        (re-search-forward (format "\\cC\\{%d\\}" furigana-span) (line-end-position))
        (put-text-property p (point) 'face `(:foreground ,background))
        (let ((kanji-width (kanji-quiz-buffer-substring-width (- (point) furigana-span) (point))))
