@@ -121,8 +121,8 @@ returned."
                            finally return (length positions))
                 0))))
 
-(defun kanji-quiz-parse-term (limit)
-  "Parse the kanji quiz term at point, to a maximum buffer position of LIMIT.
+(defun kanji-quiz-parse-term ()
+  "Parse the kanji quiz term at point.
 
 The line following point is taken to be a Japanese term.
 
@@ -136,7 +136,7 @@ kanji the furigana covers; if there is no trailing parenthesized number, the
 furigana covers a single kanji.
 
 Lines following the furigana, if present, or the term otherwise, up to the
-smaller of the LIMIT buffer position and two successive newlines, are the
+smaller of the maximum buffer position and two successive newlines, are the
 English description of the term.
 
 A three-element list is returned, containing the Japanese term as a string;
@@ -147,9 +147,9 @@ English term as a single string with embedded newline characters.
 An error is raised if the number of kanji characters in the term does not
 match the total of the furigana cover counts, if a count of zero is provided,
 or if the definition is missing."
-  (let ((lines (cl-loop while (re-search-forward (rx point (group (+ nonl)) (? ?\n)) limit t)
+  (let ((lines (cl-loop while (re-search-forward (rx point (group (+ nonl)) (? ?\n)) nil t)
                  collect (cons (cons (match-beginning 1) (match-end 1)) (match-string-no-properties 1)))))
-    (re-search-forward (rx point (* ?\n)) limit t)
+    (re-search-forward (rx point (* ?\n)) nil t)
     (when (cdr lines)
       (let* ((term (cdar lines))
              (kanji-count (how-many (rx (category chinese-two-byte)) (caaar lines) (cdaar lines))))
@@ -344,16 +344,18 @@ mode ‘kanji-quiz-mode’.  The supplied terms will be randomized and the first
 one displayed."
   (let ((terms-buffer (current-buffer))
         (terms-point (point)))
-    (goto-char start)
-    (switch-to-buffer (get-buffer-create "*kanji-quiz*"))
-    (kanji-quiz-mode)
-    (setq-local
-     nobreak-char-display nil
-     kanji-quiz-next-terms
-     (let ((inhibit-read-only t))
-       (erase-buffer)
-       (kanji-quiz-populate-quiz-buffer
-        (lambda () (with-current-buffer terms-buffer (funcall kanji-quiz-parse-term-function end))))))
+    (save-restriction
+      (narrow-to-region start end)
+      (goto-char (point-min))
+      (switch-to-buffer (get-buffer-create "*kanji-quiz*"))
+      (kanji-quiz-mode)
+      (setq-local
+       nobreak-char-display nil
+       kanji-quiz-next-terms
+       (let ((inhibit-read-only t))
+         (erase-buffer)
+         (kanji-quiz-populate-quiz-buffer
+          (lambda () (with-current-buffer terms-buffer (funcall kanji-quiz-parse-term-function)))))))
     (with-current-buffer terms-buffer (goto-char terms-point))
     (setq-local kanji-quiz-pages nil)
     (setq-local kanji-quiz-steps nil)
