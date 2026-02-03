@@ -171,14 +171,14 @@ or if the definition is missing."
 
 The string is split on whitespace characters, which for this purpose includes
 the Unicode character IDEOGRAPHIC SPACE (U+3000).  Each extracted substring
-is checked to see if it ends with a positive integer in parentheses, which
+is checked to see if it ends with a colon followed by a positive integer, which
 is the number of kanji the furigana spans.  If so, the corresponding element
-of the returned list is a cons cell containing the text preceding the opening
+in the returned list is a cons cell containing the text preceding the opening
 parenthesis and the span; if not, the element is a cons cell containing
 the entirety of the furigana text and the number 1."
   (mapcar
    (lambda (str)
-     (if (string-match (rx "(" (group (+ (any digit))) ")" string-end) str)
+     (if (string-match (rx ":" (group (+ digit)) string-end) str)
          (let ((count (string-to-number (match-string 1 str))))
            (if (zerop count)
                (error "Furigana may not span zero characters")
