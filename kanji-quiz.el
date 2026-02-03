@@ -244,6 +244,35 @@ Interactively, the START and END arguments are supplied by
   (cl-loop for pos from start to (1- end)
            sum (aref (aref (font-get-glyphs (font-at pos) pos (1+ pos)) 0) 4)))
 
+(defun kanji-quiz-normalize-term (term-data)
+  "Return the normalized form of the term data TERM-DATA, a
+three-element list.
+
+A list is returned which is a copy of TERM-DATA, except that the
+second element, the list of furigana, has been normalized to a
+list of cons cells.  Any element of the list which is not already
+a cons cell is replaced with a cons cell whose car is the
+furigana and whose cdr is 1.
+
+Furthermore, an error is raised if the number of kanji characters
+in the quiz term does not match the number of furigana strings."
+  (pcase-let* ((`(,term ,furigana ,description) term-data)
+               (kanji-count
+                (cl-loop for char across term
+                         sum (if (string-match-p (rx (category chinese-two-byte)) (string char)) 1 0)))
+               (`(,normalized-furigana . ,furigana-count)
+                (cl-reduce (pcase-lambda (`(,strs . ,sum) f)
+                             (let ((elt (if (consp f) f (cons f 1))))
+                               (cons (cons elt strs) (+ sum (cdr elt)))))
+                           furigana :initial-value '(nil . 0))))
+    (if (= kanji-count furigana-count)
+        (list term (nreverse normalized-furigana) description)
+      (error "Term %s has %d kanji characters but %d set%s of furigana"
+             (nth 0 term-data)
+             kanji-count
+             furigana-count
+             (if (= 1 furigana-count) "" "s")))))
+
 (defun kanji-quiz-populate-quiz-buffer (next-term)
   "Populate the current buffer with quiz terms supplied by the function NEXT-TERM.
 
@@ -265,14 +294,14 @@ An alist will be returned with the following symbolic keys:
   positions of the start and end of extra text"
   (cl-loop
    with background = (face-attribute 'default :background)
-   for (term furigana definition) = (funcall next-term)
+   for (term furigana definition) = (when-let (data (funcall next-term)) (kanji-quiz-normalize-term data))
    while term
    collect
    (let ((line (propertize (concat term "　") 'display `(height ,kanji-quiz-size-factor)))
          (p (point))
          (furigana-pos nil))
      (save-excursion (insert line "\n" line "\n"))
-     (cl-loop for f in furigana for (furigana-text . furigana-span) = (if (consp f) f (cons f 1)) do
+     (cl-loop for (furigana-text . furigana-span) in furigana do
        (re-search-forward (format "\\cC\\{%d\\}" furigana-span) (line-end-position))
        (put-text-property p (point) 'face `(:foreground ,background))
        (let ((kanji-width (kanji-quiz-buffer-substring-width (- (point) furigana-span) (point))))
