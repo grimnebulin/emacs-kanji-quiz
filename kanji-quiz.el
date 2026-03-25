@@ -198,7 +198,9 @@ the entirety of the furigana text and the number 1."
 
 If the region is active, return its bounds; otherwise, if there is a prefix
 argument, return the bounds from point to that many paragraphs beyond point;
-otherwise, return the bounds from point to the end of the buffer."
+otherwise, if the current buffer's major mode is org-mode, return the bounds
+of the current subtree, not including the first line and any following empty
+lines; otherwise, return the bounds from point to the end of the buffer."
   (cond
    ((region-active-p)
     (list (min (point) (mark)) (max (point) (mark))))
@@ -206,16 +208,11 @@ otherwise, return the bounds from point to the end of the buffer."
     (let ((end (save-excursion (forward-paragraph (prefix-numeric-value current-prefix-arg)) (point))))
       (list (min (point) end) (max (point) end))))
    ((eq major-mode 'org-mode)
-    (list (save-excursion
-            (org-next-visible-heading -1)
-            (forward-line)
-            (search-forward-regexp (rx bol nonl))
-            (forward-line 0)
-            (point))
-          (save-excursion
-            (org-next-visible-heading 1)
-            (forward-line -1)
-            (point))))
+    (save-restriction
+      (if (fboundp 'org-narrow-to-subtree) (funcall #'org-narrow-to-subtree) (error "No narrowing"))
+      (goto-char (point-min))
+      (search-forward-regexp (rx (+? anything) line-start nonl))
+      (list (1- (point)) (point-max))))
    (t
     (list (point) (point-max)))))
 
