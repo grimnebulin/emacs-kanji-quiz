@@ -3,6 +3,8 @@
 (require 'cl-lib)
 (require 'subr-x)
 
+(put 'kanji-quiz-error 'error-conditions '(kanji-quiz-error))
+
 (defvar kanji-quiz-next-terms nil
   "A list of the terms that will be shown on the next pass through the quiz.")
 
@@ -157,12 +159,12 @@ or if the definition is missing."
          ((zerop kanji-count)
           (list term nil (string-join (mapcar #'cdr (cdr lines)) "\n")))
          ((null (cddr lines))
-          (throw 'kanji-quiz-format (cons "Missing definition" (caaadr lines))))
+          (signal 'kanji-quiz-error (cons "Missing definition" (caaadr lines))))
          (t
           (let ((furigana (kanji-quiz-parse-furigana (cdadr lines))))
             (cond
              ((/= kanji-count (apply #'+ (mapcar #'cdr furigana)))
-              (throw 'kanji-quiz-format (cons "Sum of furigana spans does not match kanji count" (caaadr lines))))
+              (signal 'kanji-quiz-error (cons "Sum of furigana spans does not match kanji count" (caaadr lines))))
              (t
               (list term furigana (string-join (mapcar #'cdr (cddr lines)) "\n")))))))))))
 
@@ -326,7 +328,27 @@ An alist will be returned with the following symbolic keys:
              (cons 'extra (and extra-pos (list extra-pos))))))))
 
 (defvar kanji-quiz-parse-term-function #'kanji-quiz-parse-term
-  "The function which should be used to parse quiz terms from a buffer.")
+  "The function which should be used to parse quiz terms from a buffer.
+In case of error, it may raise the signal kanji-quiz-error, the error
+data being a cons cell containing the error message and the error's
+location within the buffer.")
+
+(defun kanji-quiz-parse-term-wrapper (terms-buffer)
+  "Returns an error-trapping lambda around kanji-quiz-parse-term-function.
+
+Each time this function is called, a new term is parsed from
+TERMS-BUFFER by calling kanji-quiz-parse-term-function.  If the signal
+kanji-quiz-error is raised when that function is called, it is caught,
+the terms buffer is shown, point is moved to the location of the error,
+and the error message is shown in the echo area."
+  (lambda ()
+    (condition-case error-data
+        (with-current-buffer terms-buffer
+          (funcall kanji-quiz-parse-term-function))
+      (kanji-quiz-error
+       (switch-to-buffer terms-buffer)
+       (goto-char (cddr error-data))
+       (error (cadr error-data))))))
 
 (defun kanji-quiz-start (start end progression)
   "Create a kanji quiz buffer, populate it with terms, and switch to it.
@@ -351,8 +373,7 @@ one displayed."
        kanji-quiz-next-terms
        (let ((inhibit-read-only t))
          (erase-buffer)
-         (kanji-quiz-populate-quiz-buffer
-          (lambda () (with-current-buffer terms-buffer (funcall kanji-quiz-parse-term-function)))))))
+         (kanji-quiz-populate-quiz-buffer (kanji-quiz-parse-term-wrapper terms-buffer)))))
     (with-current-buffer terms-buffer (goto-char terms-point))
     (setq-local kanji-quiz-pages nil)
     (setq-local kanji-quiz-steps nil)
