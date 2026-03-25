@@ -302,7 +302,7 @@ An alist will be returned with the following symbolic keys:
          (furigana-pos nil))
      (save-excursion (insert line "\n" line "\n"))
      (cl-loop for (furigana-text . furigana-span) in furigana do
-       (re-search-forward (format "\\cC\\{%d\\}" furigana-span) (line-end-position))
+       (re-search-forward (rx-to-string `(= ,furigana-span (category chinese-two-byte))) (line-end-position))
        (put-text-property p (point) 'face `(:foreground ,background))
        (let ((kanji-width (kanji-quiz-buffer-substring-width (- (point) furigana-span) (point))))
          (replace-match (concat " " furigana-text " "))
