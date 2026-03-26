@@ -62,7 +62,7 @@ The readings かん (kan) and ぺき (peki) will appear centered above the
 characters 完 and 璧 respectively.
 
 > 今日  
-> きょう(2)  
+> きょう/2  
 > today
 
 The reading きょう (kyō) spans both of the kanji in the word 今日, and

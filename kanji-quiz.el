@@ -131,11 +131,11 @@ The line following point is taken to be a Japanese term.
 If the term contains any kanji characters, then the next line is taken to
 contain furigana describing how to pronounce those characters.  The line is
 split on whitespace--here including the Unicode character IDEOGRAPHIC SPACE
-(U+3000)--to get a list of furigana strings, which describe how to pronounce
-the kanji, in the same order.  Each furigana string may be followed by a
-positive integer in parentheses, in which case that integer describes how many
-kanji the furigana covers; if there is no trailing parenthesized number, the
-furigana covers a single kanji.
+(U+3000)--to get a list of furigana strings, which describe how to
+pronounce the kanji, in the same order.  Each furigana string may be
+followed by a slash and a nonzero digit, in which case that digit
+describes how many kanji the furigana spans; if there is no trailing
+number, the furigana spans a single kanji.
 
 Lines following the furigana, if present, or the term otherwise, up to the
 smaller of the maximum buffer position and two successive newlines, are the
@@ -173,14 +173,14 @@ or if the definition is missing."
 
 The string is split on whitespace characters, which for this purpose includes
 the Unicode character IDEOGRAPHIC SPACE (U+3000).  Each extracted substring
-is checked to see if it ends with a colon followed by a positive integer, which
+is checked to see if it ends with a slash followed by nonzero digit, which
 is the number of kanji the furigana spans.  If so, the corresponding element
-in the returned list is a cons cell containing the text preceding the opening
-parenthesis and the span; if not, the element is a cons cell containing
-the entirety of the furigana text and the number 1."
+in the returned list is a cons cell containing the text preceding the slash
+and the span; if not, the element is a cons cell containing the entirety of
+the furigana text and the number 1."
   (mapcar
    (lambda (str)
-     (if (string-match (rx ":" (group (+ digit)) string-end) str)
+     (if (string-match (rx "/" (group (any "1-9")) string-end) str)
          (let ((count (string-to-number (match-string 1 str))))
            (if (zerop count)
                (error "Furigana may not span zero characters")
